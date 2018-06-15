@@ -1,0 +1,132 @@
+<html>
+<head>
+	<title>Chatserver</title>
+	<style>
+		#chat {
+			height: 500px;
+		}
+		#contentWrap {
+			display:none;
+		}
+		#chatWrap {
+			float: left;
+			border: 1px #000 solid;
+		}
+		.error {
+			color: red;
+		}
+		.whisper {
+			color: grey;
+			font-style: italic;
+		}
+	</style>
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+</head>
+<body>
+	<div id="nickWrap">
+		<p>Enter a username</p>
+		<p id="nickError"></p>
+		<form action="" id="setNick">
+			<input type="text" size="35" id="nickname">
+			<input type="submit">
+		</form>
+	</div>
+	
+	<div id="contentWrap">
+		<div id="chatWrap">
+			<div id="chat"></div>
+			<form action="" id="send-message">
+				<input type="text" id="message" size="35">
+				<input type="submit">
+			</form>
+		</div>
+		<div id="users">
+			
+		</div>
+	</div>
+
+		<script src="https://code.jquery.com/jquery-1.12.4.js" integrity="sha256-Qw82+bXyGq6MydymqBxNPYTaUXXq7c8v3CwiYwLLNXU=" crossorigin="anonymous"></script>
+	    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+	    <script src="/socket.io/socket.io.js"></script>
+	    <script>
+	    	jQuery(function($) {
+	    		var $nickForm = $('#setNick');
+	    		var $nickBox = $('#nickname');
+	    		var $nickError = $('#nickError');
+	    		var socket = io.connect();
+	    		var $messageForm = $('#send-message');
+	    		var $messageBox = $('#message');
+	    		var $chat = $('#chat');
+	    		var $users = $('#users');
+
+	    		$nickForm.submit(function(e) {
+	    			e.preventDefault();
+	    			socket.emit('new user', $nickBox.val(), function(data) {
+	    				if(data) {
+	    					$('#nickWrap').hide();
+	    					$('#contentWrap').show();
+	    				}
+	    				else {
+	    					$nickError.html('That username is already taken. Try again!');
+	    				}
+	    			});
+	    			$nickBox.val('');
+	    		});
+
+	    		socket.on('usernames', function(data) {
+	    			var html = '';
+	    			for(var i=0; i<data.length; i++) {
+	    				html += data[i] + '<br/>';
+	    			}
+	    			$users.html(html);
+	    		});
+
+	    		$messageForm.submit(function(e) {
+	    			e.preventDefault();
+	    			socket.emit('send message', $messageBox.val(), function(data) {
+	    				$chat.append('<span class="error">' + data + "</span><br/>");
+	    			});
+	    			$messageBox.val('');
+	    		})
+
+	    		socket.on('load old msgs', function(docs) {
+	    			for(var i=docs.length-1; i >= 0; i--) {
+	    				displayMsg(docs[i]);
+	    			}
+	    		})
+
+	    		socket.on('starting message', function(data) {
+	    			$chat.append('<span class="msg">' + data.msg + '<b>'+data.nick + "</b></span><br/>");
+	    		})
+
+	    		socket.on('new message', function(data) {
+	    			k = data.msg.split(' ');
+	    			if(k[0] === 'server') {
+	    				if(k[1]==='grouplist' && k.length == 2) {
+	    					socket.emit('request grouplist', function(err, data) {
+	    						if(err)
+	    							throw err;
+	    						$chat.append('<span class="msg"><b>' + data[0] + "</b></span><br/>");
+	    						for(var i=1; i < data.length; i++) {
+	    							$chat.append('<span class="msg"><b>' + data[i] + "</b></span>, ");
+				    			}
+				    			$chat.append('<br/>');
+	    					})
+	    				}
+	    			}
+	    			else {
+		    			displayMsg(data);
+		    		}
+	    		});
+
+	    		function displayMsg(data) {
+	    			$chat.append('<span class="msg"><b>' + data.nick + ': </b>' + data.msg + "</span><br/>");
+	    		}
+
+	    		socket.on('whisper', function(data) {
+	    			$chat.append('<span class="whisper"><b>' + data.nick + ': </b>' + data.msg + "</span><br/>");
+	    		})
+	    	});
+	    </script>
+</body>
+</html>
